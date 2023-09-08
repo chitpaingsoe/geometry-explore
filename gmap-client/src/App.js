@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-
 import GoogleMapReact from 'google-map-react';
 import { SGLOC } from './const/la_center';
+import MarkerClusterer from "@google/markerclusterer";
+import { v4 as uuid } from 'uuid';
 
 const Wrapper = styled.main`
   width: 100%;
@@ -10,11 +11,10 @@ const Wrapper = styled.main`
 `;
 
 const App = () => {
-  const [marker, setMarker] = useState(null);
+  const [markers, setMarkers] = useState([]);
   const [map, setMap] = useState(null);
   const [maps, setMaps] = useState(null);
   const [bounds, setBounds] = useState(null);
-  const [result, setResult] = useState([]);
   const [searching, setSearching] = useState(false);
   const [count, setCount] = useState(0);
   const [render, setRender] = useState(false);
@@ -22,7 +22,9 @@ const App = () => {
   const [dataSource, setDataSource] = useState("/search");
   const [trackingTimer, setTrackingTimer] = useState(null);
   const [zoom, setZoom] = useState(12);
-
+  const [autorefresh, setAutoRefresh] = useState(false);
+  const [autoRefreshTimer, setAutoRefreshTimer] = useState(null);
+  const [markerclusters, setMarkerClusters] = useState([]);
 
 
 
@@ -31,7 +33,8 @@ const App = () => {
   const apiIsLoaded = (map, maps) => {
     setMap(map);
     setMaps(maps);
-    setBounds(map.getBounds().toJSON())
+    setBounds(map.getBounds().toJSON());
+
   };
 
 
@@ -42,56 +45,83 @@ const App = () => {
     if (map) {
       const coord = map.getBounds().toJSON();
       setBounds(coord);
-      searchData(coord);
     }
   }
 
   const cleanup = () => {
-    // setResponseText(null);
-    setCount(0);
-    if (marker) {
-      marker.setMap(null);
-      setMarker(null);
-    }
-    // if (result.length > 0) {
-    //   result.map(m => {
-    //     if (m.position) {
-    //       m.setMap(null);
-    //     }
-    //   });
-    //   setResult([]);
-    // }
+    markerclusters.map(val=> {
+      let markercluster = val.cluster;
+      if(markercluster !== null){
+        markercluster.clearMarkers();
+        var tmp = markerclusters;
+        var tmp1 = tmp.filter(x=> x.id === val.id)
+        setMarkerClusters([...tmp1])
+      }
+    })
+    
   }
 
-  const searchData = (box) => {
+  const fetchData = () => {
+    const box = map.getBounds().toJSON();
     cleanup();
     if (!box) {
       alert("Cannot determine Bounding box!")
       return;
     }
-    setSearching(true);
     const requestOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ south: box.south, west: box.west, north: box.north, east: box.east })
     };
 
-    fetch('https://localhost:7063/api/bus' + dataSource, requestOptions)
+    return fetch('https://localhost:7063/api/bus' + dataSource, requestOptions);
+  }
+
+  const putData = (payload) => {
+    const requestOptions = {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    };
+
+    fetch('https://localhost:7063/api/bus', requestOptions)
+      .then(response => response)
+      .then(res => {
+        console.log(res)
+      });
+  }
+
+  const searchData = () => {
+    cleanup();
+    setSearching(true);
+    fetchData()
       .then(response => response.json())
       .then(res => {
         let data = res.data;
         setResponseText(res.executionTime)
+        setMarkers(data)
+        let result = [];
         if (render) {
-          let result = data.map((val) => {
-            return new maps.Marker({
-              position: { lat: val.lat, lng: val.lng },
+          data.map((i) => {
+            result.push(new maps.Marker({
+              position: { lat: i.lat, lng: i.lng },
               map: map,
-              title: 'Data'
-            });
+            }));
+          });
+          setMarkers([...result]);
+          let markerCluster = new MarkerClusterer(map, result, {
+            imagePath: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m',
+            gridSize: 10,
+            minimumClusterSize: 2
+          });
+          let tmp = markerclusters;
+          tmp.push({
+            id: uuid(),
+            cluster: markerCluster
           })
-          setResult(result)
+          setMarkerClusters([...tmp])
         } else {
-          setResult(data);
+          setMarkers(data);
         }
         setSearching(false);
       });
@@ -168,13 +198,21 @@ const App = () => {
   }
 
   const simulateTracking = () => {
-    if (map) {
-      const b = map.getBounds().toJSON();
-      b.east -= 0.001;
-      b.north += 0.001;
-      map.fitBounds(b)
-      map.setZoom(zoom);
-    }
+    fetchData()
+      .then(response => response.json())
+      .then(res => {
+        let data = res.data;
+        setResponseText(res.executionTime)
+        let payload = data.map((i) => {
+          return {
+            id: i.id,
+            name: i.name,
+            lat: i.lat,
+            lng: i.lng + 0.00005
+          }
+        });
+        putData(payload)
+      });
   }
 
 
@@ -213,6 +251,26 @@ const App = () => {
                   setRender(e.target.checked)
                 }} /> &nbsp;View Markers</label>
             </div>
+            <br />
+            <div>
+              <label><input type="checkbox"
+                value={autorefresh}
+                defaultChecked={autorefresh}
+                onChange={e => {
+                  setAutoRefresh(e.target.checked);
+                  if (e.target.checked === true) {
+                    var timer = setInterval(() => {
+                      searchData();
+                    }, 1500);
+                    setAutoRefreshTimer(timer);
+                  } else {
+                    if (autoRefreshTimer) {
+                      clearInterval(autoRefreshTimer);
+                      setAutoRefreshTimer(null);
+                    }
+                  }
+                }} /> &nbsp;AutoRefresh</label>
+            </div>
             <br /> <br />
             <div>
               <button onClick={() => {
@@ -231,7 +289,7 @@ const App = () => {
             </div>
             <br /> <br />
             <div>
-              <button onClick={_ => searchData(bounds)}>Search</button>&nbsp;&nbsp;
+              <button onClick={_ => searchData()}>Search</button>&nbsp;&nbsp;
               <button onClick={cleanup}>Clear</button>&nbsp;&nbsp;
               <button onClick={deleteALlDataInfo}>Delete Data</button>
             </div>
@@ -242,8 +300,8 @@ const App = () => {
               searching && (<div>Searching .............</div>)
             }
             {
-              result.length > 0 ? (
-                <div><b>ExectionTime: {responseText}ms, Result Count: {result.length}</b></div>
+              markers.length > 0 ? (
+                <div><b>ExectionTime: {responseText}ms, Result Count: {markers.length}</b></div>
               ) : !searching && (<div>No data found in this area...</div>)
             }
           </div>
@@ -258,7 +316,25 @@ const App = () => {
             onGoogleApiLoaded={({ map, maps }) => apiIsLoaded(map, maps)}
             onZoomAnimationEnd={updateBounds}
             onDragEnd={updateBounds}
+            bootstrapURLKeys={{
+              key: '',
+              libraries: ['places', 'geometry', 'drawing', 'visualization']
+            }}
           >
+            {/* <MarkerClusterer
+              options={{
+                imagePath:
+                  "https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m"
+              }}
+            >
+              {markers.map((location, i) => (
+                <Marker
+                  key={i}
+                  position={location}
+                />
+              ))
+              }
+            </MarkerClusterer> */}
           </GoogleMapReact>
         </Wrapper>
       </div>

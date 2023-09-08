@@ -79,6 +79,33 @@ namespace GeomertryDev.Controllers
 
             return Ok(new { executionTime = elapsed.TotalMilliseconds, data = buses });
         }
+        [HttpPost("SearchByGroup")]
+        public async Task<ActionResult> SearchByGroup([FromBody] SearchDto bound)
+        {
+
+            var box = ConvertBoundToPolygon(bound);
+            var centroid = box.Centroid;
+
+            var dimension = GetBboxDimension(bound);
+
+            var stw = new Stopwatch();
+
+            stw.Start();
+
+
+            var buses = _context.BusInfos
+                .Where(x => box.Contains(x.Location))
+                .Select(x => new PointDto { Id = x.Id, Lng = x.Location.X, Lat = x.Location.Y });
+            var data = KMeans.Cluster(buses.ToArray(), 3)
+                .GroupBy(x=> x.Item1)
+                .Select(x => new { GroupId = x.Key, Items = x.Select(x=> x.Item2), Lat = x.Select(y => y.Item2.Lat).Average(), Lng = x.Select(y => y.Item2.Lng).Average() })
+                .ToList();
+            var elapsed = stw.Elapsed;
+
+
+            return Ok(new { executionTime = elapsed.TotalMilliseconds, data = data });
+        }
+
         [HttpPost("SearchInCache")]
         public ActionResult SearchInCache([FromBody] SearchDto bound)
         {
@@ -123,9 +150,21 @@ namespace GeomertryDev.Controllers
         }
 
         // PUT api/<BusController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        [HttpPut]
+        public void Put([FromBody] BusInfoDto[] payload)
         {
+            var list = new List<BusInfo>();
+            foreach (var value in payload)
+            {
+                var bus = _context.BusInfos.Where(x=> x.Id == value.Id).FirstOrDefault();
+                if(bus != null)
+                {
+                    bus.Location = new Point(value.Longitude, value.Latitude) { SRID = 4326 };
+                    list.Add(bus);
+                }
+            }
+            _context.BusInfos.UpdateRange(list);
+            _context.SaveChanges();
         }
 
         // DELETE api/<BusController>/5
@@ -162,6 +201,22 @@ namespace GeomertryDev.Controllers
             var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
             var box = new Polygon(new LinearRing(coordinates.ToArray()), geometryFactory);
             return box;
+        }
+
+        private Tuple<double, double> GetBboxDimension(SearchDto bound)
+        {
+            var box = ConvertBoundToPolygon(bound);
+            var centroid = box.Centroid;
+
+
+            var point1 = new Point(bound.X1, bound.Y2) { SRID = 4326 };
+            var point2 = new Point(bound.X1, bound.Y1) { SRID = 4326 };
+            var point3 = new Point(bound.X2, bound.Y1) { SRID = 4326 };
+
+            var height = DistanceHelper.GreatCircleDistance(point1.X, point1.Y, point2.X, point2.Y);
+            var width = DistanceHelper.GreatCircleDistance(point2.X, point2.Y, point3.X, point3.Y);
+
+            return new Tuple<double, double>(width, height);
         }
 
        

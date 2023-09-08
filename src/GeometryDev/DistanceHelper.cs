@@ -28,5 +28,12 @@
             return dist;
 
         }
+        public static double GetDistance(double lat, double lng)
+        {
+            return Math.Acos(Math.Cos(37) * Math.Cos(Radians(lat)) * Math.Cos(Radians(lng)) -
+                    Radians(-122) + Math.Sin(Radians(37)) * Math.Sin(Radians(lat))
+                );
+        }
+       
     }
 }

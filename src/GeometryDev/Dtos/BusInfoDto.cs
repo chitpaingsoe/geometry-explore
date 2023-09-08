@@ -5,6 +5,9 @@ namespace GeomertryDev.Dtos
     public class BusInfoDto
     {
 
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
