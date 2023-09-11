@@ -49,16 +49,16 @@ const App = () => {
   }
 
   const cleanup = () => {
-    markerclusters.map(val=> {
+    markerclusters.map(val => {
       let markercluster = val.cluster;
-      if(markercluster !== null){
+      if (markercluster !== null) {
         markercluster.clearMarkers();
         var tmp = markerclusters;
-        var tmp1 = tmp.filter(x=> x.id === val.id)
+        var tmp1 = tmp.filter(x => x.id === val.id)
         setMarkerClusters([...tmp1])
       }
     })
-    
+
   }
 
   const fetchData = () => {
@@ -74,7 +74,7 @@ const App = () => {
       body: JSON.stringify({ south: box.south, west: box.west, north: box.north, east: box.east })
     };
 
-    return fetch('https://localhost:7063/api/bus' + dataSource, requestOptions);
+    return fetch('http://localhost:7063/api/bus' + dataSource, requestOptions);
   }
 
   const putData = (payload) => {
@@ -84,7 +84,7 @@ const App = () => {
       body: JSON.stringify(payload)
     };
 
-    fetch('https://localhost:7063/api/bus', requestOptions)
+    fetch('http://localhost:7063/api/bus', requestOptions)
       .then(response => response)
       .then(res => {
         console.log(res)
@@ -124,6 +124,15 @@ const App = () => {
           setMarkers(data);
         }
         setSearching(false);
+
+        // update log
+        var log = document.getElementById("log");
+        if (log) {
+          var date = new Date();
+          console.log("append")
+          log.innerHTML += `<p>At: ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}::${date.getMilliseconds()}, ExecutionTime: ${res.executionTime}ms, Count: ${data.length}</p>`
+          log.scrollTop = log.scrollHeight;
+        }
       });
   }
 
@@ -135,7 +144,7 @@ const App = () => {
       body: JSON.stringify(payload)
     };
 
-    fetch('https://localhost:7063/api/bus', requestOptions)
+    fetch('http://localhost:7063/api/bus', requestOptions)
       .then(response => response)
       .then(_ => {
         cleanup();
@@ -152,7 +161,7 @@ const App = () => {
         headers: { 'Content-Type': 'application/json' },
       };
 
-      fetch('https://localhost:7063/api/bus', requestOptions)
+      fetch('http://localhost:7063/api/bus', requestOptions)
         .then(response => response)
         .then(_ => {
           cleanup();
@@ -211,7 +220,7 @@ const App = () => {
             lng: i.lng + 0.00005
           }
         });
-        putData(payload)
+        putData(payload);
       });
   }
 
@@ -297,14 +306,20 @@ const App = () => {
 
           <div style={{ marginTop: "20px" }}>
             {
-              searching && (<div>Searching .............</div>)
-            }
-            {
-              markers.length > 0 ? (
-                <div><b>ExectionTime: {responseText}ms, Result Count: {markers.length}</b></div>
-              ) : !searching && (<div>No data found in this area...</div>)
+              searching ? (<div>Searching .............</div>) :
+
+                markers.length > 0 ? (
+                  <div><b>ExectionTime: {responseText}ms, Result Count: {markers.length}</b></div>
+                ) : !searching && (<div>No data found in this area...</div>)
             }
           </div>
+          <br />
+          <div id="log" style={{
+            color: "green",
+            fontWeight: "bold",
+            overflow: "auto",
+            maxHeight: "400px"
+          }}></div>
         </div>
       </div>
       <div style={{ height: '100vh', width: '80%', float: "right" }}>

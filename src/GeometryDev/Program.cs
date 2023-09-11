@@ -19,7 +19,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddPooledDbContextFactory<LTAContext>(options => 
-options.UseSqlServer(builder.Configuration.GetConnectionString("LTAContext"), x => x.UseNetTopologySuite().MigrationsAssembly("GeometryDev"))
+options.UseSqlServer(builder.Configuration.GetConnectionString("LTAContext"), x => x.UseNetTopologySuite().MigrationsAssembly("GeometryDev").EnableRetryOnFailure())
 );
 
 builder.Services.AddScoped<LTADbContextFactory>();

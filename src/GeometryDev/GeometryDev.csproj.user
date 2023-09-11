@@ -5,5 +5,6 @@
   </PropertyGroup>
   <PropertyGroup>
     <ActiveDebugProfile>GeometryDev</ActiveDebugProfile>
+    <NameOfLastUsedPublishProfile>D:\dev3\geometry-dev\src\GeometryDev\Properties\PublishProfiles\FolderProfile.pubxml</NameOfLastUsedPublishProfile>
   </PropertyGroup>
 </Project>

@@ -29,7 +29,7 @@ if(arg.Length > 1)
 }
 
 
-var url = "https://localhost:7063/api/bus";
+var url = "http://localhost:7063/api/bus";
 if(dataSource == "db")
 {
     url += "/search";
